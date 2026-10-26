@@ -1,0 +1,216 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>FIT5215 Cheat Sheet</title>
+<style>
+@page { size: A4; margin: 6mm; }
+* { box-sizing: border-box; }
+html, body { margin:0; padding:0; background:#fff; }
+body { font-family: "Segoe UI", Arial, sans-serif; font-size: 6.75pt; line-height: 1.22; color:#111; }
+.page { height: 284.5mm; column-count: 3; column-gap: 3.2mm; column-rule: 0.4pt solid #bbb; column-fill: auto; overflow: hidden; }
+.page + .page { break-before: page; }
+h1 { font-size: 7.6pt; margin: 0 0 1.2mm; padding: 0.9mm 1.5mm; color:#fff; border-radius: 1mm; break-after: avoid; }
+h2 { font-size: 6.9pt; margin: 1.3mm 0 0.5mm; padding-bottom: 0.2mm; border-bottom: 0.6pt solid currentColor; break-after: avoid; }
+.w7 h1{background:#1f5fa8} .w7 h2{color:#1f5fa8}
+.w8 h1{background:#2e7d32} .w8 h2{color:#2e7d32}
+.w9 h1{background:#8e24aa} .w9 h2{color:#8e24aa}
+.w10 h1{background:#d35400} .w10 h2{color:#d35400}
+.w11 h1{background:#c62828} .w11 h2{color:#c62828}
+.week { margin-bottom: 1.6mm; }
+ul { margin: 0; padding-left: 2.6mm; }
+li { margin: 0 0 0.35mm; }
+p { margin: 0 0 0.5mm; }
+.f { font-family: "Cambria Math", Cambria, "Times New Roman", serif; font-size: 7.1pt; background:#f3f5f9; border-left: 1.3pt solid #9aa7bd; padding: 0.35mm 1mm; margin: 0.35mm 0; break-inside: avoid; }
+.trap { background:#fff4d6; border-left:1.3pt solid #e0a100; padding:0.35mm 1mm; margin:0.4mm 0; break-inside: avoid; }
+.quiz { background:#eef7ee; border:0.6pt solid #7cb87c; border-radius:0.8mm; padding:0.5mm 1mm; margin:0.6mm 0; break-inside: avoid; }
+.quiz b.qt { display:block; color:#1b5e20; font-size:6.9pt; margin-bottom:0.3mm; }
+.quiz ul { padding-left: 2.6mm; }
+.quiz li { margin-bottom: 0.45mm; }
+b { font-weight: 700; }
+.k { color:#b00020; font-weight:700; }
+sub, sup { font-size: 70%; line-height: 0; }
+.hdr { font-size: 6pt; color:#555; margin-bottom: 1mm; }
+code { font-family: Consolas, monospace; font-size: 6.2pt; background:#eee; padding:0 0.4mm; }
+</style></head><body>
+
+<div class="page">
+<div class="hdr"><b>FIT3181/5215 Deep Learning — Weeks 7–11 cheat sheet.</b> Green boxes = key concepts the quizzes test (likely to be re-used). <span class="k">Red</span> = common trap. Shapes use PyTorch <code>batch_first=True</code>.</div>
+
+<!-- ================= WEEK 7 ================= -->
+<div class="week w7">
+<h1>WEEK 7 · RNNs, LSTM, GRU (sequential data)</h1>
+<h2>Probability of sequences</h2>
+<div class="f">Chain rule: p(x<sub>1:T</sub>) = p(x<sub>1</sub>) ∏<sub>t</sub> p(x<sub>t</sub> | x<sub>1:t−1</sub>)</div>
+<div class="f"><b>1st-order Markov:</b> p(x<sub>1:n</sub>) = p(x<sub>n</sub>|x<sub>n−1</sub>)…p(x<sub>2</sub>|x<sub>1</sub>)p(x<sub>1</sub>) &nbsp;(only previous item)</div>
+<ul><li>RNN = autoregressive model; h<sub>t</sub> = g(h<sub>t−1</sub>, x<sub>t</sub>) is a <b>lossy summary</b> of x<sub>1:t</sub>. Pre-DL: HMM, Kalman filter, DBN, CRF.</li></ul>
+<h2>Simple RNN (same U, W, V shared over time)</h2>
+<div class="f">h<sub>0</sub> = tanh(x<sub>0</sub>U + b) &nbsp;&nbsp; h<sub>t</sub> = tanh(h<sub>t−1</sub>W + x<sub>t</sub>U + b)<br>
+ŷ<sub>t</sub> = h<sub>t</sub>V + c (regression) &nbsp;|&nbsp; softmax(h<sub>t</sub>V + c) (classification)<br>
+Total loss = Σ<sub>t</sub> l(ŷ<sub>t</sub>, y<sub>t</sub>)</div>
+<div class="f">U:[in, hid] &nbsp; W:[hid, hid] &nbsp; V:[hid, out]</div>
+<div class="trap"><b>Trap:</b> x is always multiplied by <b>U</b>, h by <b>W</b>, output uses <b>V</b>. "h<sub>1</sub>=tanh(h<sub>0</sub>W+x<sub>1</sub><span class="k">V</span>+b)" and "y=h<span class="k">U</span>+c" are WRONG.</div>
+<h2>Parameter counting</h2>
+<div class="f">RNN cell: in·h + h·h + h &nbsp;→ in=10, h=5: 10×5 + 5×5 + 5 = <b>80</b><br>
+LSTM = 4 × (in·h + h² + h) &nbsp;&nbsp; GRU = 3 × (in·h + h² + h)<br>
+(PyTorch keeps 2 bias vectors: +h per gate block) &nbsp; Embedding = vocab × emb &nbsp; Linear = in·out + out</div>
+<h2>BPTT &amp; vanishing gradient</h2>
+<div class="f">∂L/∂h<sub>0</sub> = Σ<sub>t</sub> ∂loss<sub>t</sub>/∂ŷ<sub>t</sub> · ∂ŷ<sub>t</sub>/∂h<sub>t</sub> · diag(1−h̄<sub>t</sub>²)W ⋯ diag(1−h̄<sub>1</sub>²)W</div>
+<ul><li>Product of many W ⇒ <b>vanishing/exploding</b> gradients ⇒ RNN only captures <b>short-term</b> dependency. Fix = gating (add a linear path) → LSTM/GRU.</li>
+<li>BPTT: unroll, forward &amp; store, backprop from last step, <b>sum local gradients</b> per parameter, then SGD.</li></ul>
+<h2>LSTM (Hochreiter &amp; Schmidhuber ’97)</h2>
+<div class="f">f<sub>t</sub> = σ(x<sub>t</sub>U<sub>f</sub> + h<sub>t−1</sub>W<sub>f</sub> + b<sub>f</sub>) &nbsp; i<sub>t</sub> = σ(…<sub>i</sub>) &nbsp; o<sub>t</sub> = σ(…<sub>o</sub>)<br>
+g<sub>t</sub> = tanh(x<sub>t</sub>U + h<sub>t−1</sub>W + b)<br>
+<b>c<sub>t</sub> = f<sub>t</sub> ⊙ c<sub>t−1</sub> + i<sub>t</sub> ⊙ g<sub>t</sub></b> &nbsp;(long-term) &nbsp;&nbsp; <b>h<sub>t</sub> = o<sub>t</sub> ⊙ tanh(c<sub>t</sub>)</b> &nbsp;(short-term)</div>
+<ul><li>3 gates use <b>sigmoid</b> (0–1 proportion); candidate g uses tanh. 4 FC blocks.</li>
+<li><b>Forget</b>: proportion of long-term c<sub>t−1</sub> carried forward. <b>Input</b>: how much of g<sub>t</sub> stored. <b>Output</b>: proportion of current long-term c<sub>t</sub> passed to new short-term h<sub>t</sub>.</li></ul>
+<h2>GRU (Cho et al. 2014, built for encoder–decoder)</h2>
+<div class="f">z<sub>t</sub> = σ(x<sub>t</sub>U<sub>z</sub> + h<sub>t−1</sub>W<sub>z</sub>) &nbsp; r<sub>t</sub> = σ(x<sub>t</sub>U<sub>r</sub> + h<sub>t−1</sub>W<sub>r</sub>)<br>
+g<sub>t</sub> = tanh(x<sub>t</sub>U<sub>g</sub> + (r<sub>t</sub> ⊙ h<sub>t−1</sub>)W<sub>g</sub>) &nbsp;&nbsp; <b>h<sub>t</sub> = (1−z<sub>t</sub>) ⊙ h<sub>t−1</sub> + z<sub>t</sub> ⊙ g<sub>t</sub></b></div>
+<ul><li>Merges c and h into one state; single <b>update gate z</b> = forget+input (z=1: open input / close forget); <b>no output gate</b>; <b>reset gate r</b> controls how much of the previous state is used. z, r → 1 ⇒ basic RNN.</li></ul>
+<h2>Shapes (the most-asked quiz type)</h2>
+<div class="f">Input ids [B, L] → Embedding [B, L, emb] → each RNN/GRU layer [B, L, <i>its own hidden</i>] → Flatten [B, L·h] → Linear [B, out]</div>
+<ul><li><code>out, h_n = nn.GRU(...)(x)</code>: out = [B, L, h] (all steps); h_n = [layers, B, h]. Sequence-first form [L, B, in] ⇒ <code>torch.transpose(X,0,1)</code>.</li>
+<li>Embedding lookup = one-hot 1<sub>i</sub> × E = row i of E. Sentiment: (B,L)→(B,L,emb)→(B,L,128)→(B,128) last state→(B,1) sigmoid ≥0.5 pos.</li>
+<li>Char-level text generation: x<sub>0</sub>='*' start, '$' end; max log-lik = min Σ CE at each step; output = #chars neurons.</li></ul>
+<h2>Topologies</h2>
+<ul><li><b>many→one</b>: sentiment analysis, sequence classification · <b>one→many</b>: image captioning · <b>many→many (enc–dec, delayed)</b>: machine translation · <b>many→many (synced)</b>: frame-level video classification.</li></ul>
+<div class="quiz"><b class="qt">★ Week 7 key concepts (what the quiz tests)</b><ul><li><b>1st-order Markov</b>: each item depends only on the one before it: p(x<sub>n</sub>|x<sub>n−1</sub>)…p(x<sub>2</sub>|x<sub>1</sub>)p(x<sub>1</sub>).</li><li><b>Parameter count</b> = in×h (U) + h×h (W) + h (bias). Input 10, hidden 5 → 50 + 25 + 5 = 80.</li><li>Input x is always multiplied by <b>U</b>, previous state h by <b>W</b>, output by <b>V</b>; the same U and W are reused at every time step.</li><li><b>Topologies</b>: sentiment = many→one · captioning = one→many · translation = many→many (encoder–decoder) · frame-level video = many→many (synced).</li><li><b>Shapes</b>: embedding gives [B, L, emb]; every RNN/GRU layer gives [B, L, <i>its own</i> hidden size] (L unchanged); Flatten gives [B, L×h] (5×16 = 80); Linear gives [B, out].</li><li><code>h, _ = gru(x)</code> keeps the <b>all-steps output</b> [B, L, h], not just the last state.</li><li>All LSTM gates use <b>sigmoid</b>. Forget gate = share of long-term c<sub>t−1</sub> kept. Output gate = share of the current long-term c<sub>t</sub> passed into the new short-term h<sub>t</sub>.</li></ul></div>
+</div>
+
+<!-- ================= WEEK 8 ================= -->
+<div class="week w8">
+<h1>WEEK 8 · Word embedding, Word2Vec</h1>
+<h2>Classical text features</h2>
+<ul><li>Pipeline: normalise → features (tf-idf, word2vec) → model (NB, SVM / LDA / k-means) → metrics (Acc, P/R; ROUGE, BLEU; NMI, Silhouette).</li>
+<li>Normalisation: expand contractions (isn't→is not), <b>lemmatisation</b> (cars→car, running→run, is→be), remove special chars, remove stop words.</li>
+<li>Bag-of-words: doc = Σ one-hot(words) = counts; stacked = term-by-document matrix.</li></ul>
+<div class="f">idf(t,C) = log(|C| / |C<sub>t</sub>|) &nbsp;(|C<sub>t</sub>| = #docs containing t) &nbsp;&nbsp; smoothed: log((1+|C|)/(1+|C<sub>t</sub>|))<br>
+tfidf(t,d,C) = tf(t,d) × idf(t,C) &nbsp;&nbsp; L2-normalise: v / √(v<sub>1</sub>²+…+v<sub>n</sub>²)<br>
+natural log: ln2 = 0.69. Term in every doc ⇒ idf = 0. Ex: [0.69,0,0,0.69,0] → [0.71,0,0,0.71,0]</div>
+<h2>Representation learning</h2>
+<ul><li>Hand-crafted (SIFT/HOG/TF-IDF, extractor disconnected from classifier) vs DL (automatic, connected). Supervised rep = fits one downstream task; unsupervised = general.</li>
+<li><b>Self-supervised</b>: invent a <b>pretext task</b> to turn raw data into supervised learning (e.g. predict rotation 0/90/180/270 → 4 labels). Word2Vec's pretext task: predict neighbours ("know a word by the company it keeps" – Firth).</li></ul>
+<h2>Skip-gram (target → context)</h2>
+<div class="f">U ∈ ℝ<sup>N×d</sup> (input→hidden), V ∈ ℝ<sup>d×N</sup> (hidden→output), N = vocab size, d = embedding size<br>
+h = 1<sub>t</sub>U = U<sub>t</sub> (<b>row t of U</b>) &nbsp; o = hV ∈ ℝ<sup>1×N</sup> &nbsp; p = softmax(o)<br>
+log p(cw=c | tw=t) = U<sub>t</sub>V<sub>:,c</sub> − log Σ<sub>k</sub> exp(U<sub>t</sub>V<sub>:,k</sub>)</div>
+<div class="f">J(θ) = ∏<sub>t=1..T</sub> ∏<sub>−C≤j≤C, j≠0</sub> p(w<sub>t+j</sub> | w<sub>t</sub>; θ) &nbsp;→ <b>maximise</b>; t = index of centre word</div>
+<ul><li>Training pairs: (brown,the), (brown,quick), (brown,fox), (brown,jumps) for C=2.</li>
+<li><b>Drawbacks</b>: softmax over huge N is expensive; probabilities tiny &amp; hard to distinguish; depends on window size. Fixes: <b>hierarchical softmax</b> O(V)→O(log V), <b>negative sampling</b>.</li></ul>
+<h2>Negative sampling</h2>
+<div class="f">p = <b>sigmoid</b>(o) (binary, NOT a distribution) &nbsp; max log p<sub>c</sub> − α log p<sub>n1</sub> − α log p<sub>n2</sub></div>
+<ul><li>Positive pair [(tw,cw),1] → maximise prob of being positive; random negatives [(tw,ng),0] → <b>minimise</b> prob of predicting them as positive.</li></ul>
+<h2>CBOW (context → target)</h2>
+<div class="f">h = ¼(1<sub>c1</sub>+1<sub>c2</sub>+1<sub>c3</sub>+1<sub>c4</sub>)U = <b>average of context rows of U</b>; o = hV; p = softmax(o)<br>
+J(θ) = ∏<sub>t</sub> p(w<sub>t</sub> | w<sub>t−C</sub>,…,w<sub>t−1</sub>,w<sub>t+1</sub>,…,w<sub>t+C</sub>) &nbsp; window size = <b>2C+1</b></div>
+<h2>Using embeddings</h2>
+<div class="f">Analogy: argmin<sub>v</sub> ‖v<sub>Canberra</sub> − v<sub>Australia</sub> + v<sub>Paris</sub> − v‖ = v<sub>France</sub>; &nbsp;cosine similarity for nearest words</div>
+<ul><li>Init an RNN's embedding matrix with pretrained Word2Vec, then fine-tune (vs train from scratch).</li>
+<li><b>doc2vec</b>: doc matrix D[N×p] + word matrix W[M×q], average/concat, predict word. <b>node2vec</b>: random walks = sentences. BFS = local/microscopic, DFS = global/macroscopic; p = return param, q = walk-away param; low p → BFS-like, low q → DFS-like. Also item2vec, med2vec, topic2vec…</li></ul>
+<div class="trap"><b>Traps:</b> vocabulary/dictionary size N = #unique words (10k), not #sentences. Embedding size d is a free hyper-parameter (NOT the window size). Skip-gram input = one-hot of the <b>target</b>; CBOW input = <b>average</b> of context one-hots.</div>
+<div class="quiz"><b class="qt">★ Week 8 key concepts (what the quiz tests)</b><ul><li><b>Skip-gram</b>: the centre word predicts each context word. <b>CBOW</b>: the context words predict the centre word. Window 7 = centre + 3 words each side.</li><li>Analogy by vector arithmetic: king − prince ≈ queen − princess.</li><li>One-hot = 1 at the word's index (check whether the dictionary starts at 0 or 1).</li><li>Vocabulary size N = number of <b>unique words</b>, not sentences. Embedding size d is a chosen setting; the window size doesn't determine it.</li><li>Skip-gram drawbacks: softmax over N is expensive; probabilities are tiny and hard to tell apart; results depend on the window size.</li><li><b>Negative sampling</b>: sigmoid output (outputs don't sum to 1); push (target, context) towards positive and (target, random word) away from positive.</li><li>∏<sub>t</sub>∏<sub>j≠0</sub> p(w<sub>t+j</sub>|w<sub>t</sub>) = skip-gram objective (t = centre word, maximise). p(w<sub>t</sub>|w<sub>t−C…t+C</sub>) = CBOW objective, window = 2C+1.</li><li>U is [N, d], V is [d, N]. Skip-gram: input = one-hot of the target, h = <b>that row of U</b>. CBOW: input = <b>average</b> of the context one-hots, h = average of their rows.</li><li>Reading a toy network: vocab size = rows of U, embedding size = columns. A probability is the <b>softmax output</b> at the context word's index, not the raw score o = hV.</li></ul></div>
+</div>
+
+<!-- ================= WEEK 9 ================= -->
+<div class="week w9">
+<h1>WEEK 9 · Seq2Seq, Attention, Transformer, BERT</h1>
+<h2>Encoder–decoder / seq2seq</h2>
+<ul><li><b>Encoder</b> encodes input sequence → context <b>c = h<sub>T<sub>x</sub></sub></b> (last <b>encoder</b> hidden state) summarising x. <b>Decoder</b> reads c → output sequence. In MT both are <b>RNNs</b>. Apps: MT, image captioning (CNN enc), code translation, QA.</li></ul>
+<div class="f">max<sub>θ</sub> Σ<sub>(x,y)</sub> log P(y|x,θ), θ = [θ<sub>e</sub>, θ<sub>d</sub>]<br>
+P(y|x) = P(y<sub>1:Ty</sub>|c) <sup>(1)</sup>= ∏<sub>j</sub> P(y<sub>j</sub> | y<sub>1:j−1</sub>, c) <sup>(2)</sup>= ∏<sub>j</sub> P(y<sub>j</sub> | q<sub>j−1</sub>, c)</div>
+<ul><li>(1): c summarises x<sub>1:Tx</sub>. (2): q<sub>j−1</sub> summarises y<sub>1:j−1</sub>. P(y<sub>j</sub>|q<sub>j−1</sub>,c) = dense layers on top of q<sub>j−1</sub>, c (output = vocab+1).</li>
+<li>Variants: q<sub>j−1</sub> = f(q<sub>j−2</sub>, y<sub>j−1</sub>) [Sutskever] or f(q<sub>j−2</sub>, concat(c, y<sub>j−1</sub>)) [Cho]; f = LSTM/GRU. Big drawback: c fixed across timesteps.</li>
+<li><b>Inference</b>: phase 1 feed x to encoder to get c; phase 2 init decoder state with c (last encoder hidden), feed <b>&lt;BOS&gt;</b>, stop at &lt;EOS&gt;. <b>Greedy</b> = pick argmax each step (not sampling). <b>Beam search (k)</b>: keep top-k partial sequences by joint probability; finish when each beam outputs &lt;EOS&gt;; return best.</li></ul>
+<h2>Attention (timely-varied context c<sub>t</sub>)</h2>
+<ul><li>Fixed c is a bottleneck, overwhelmed by long inputs; c<sub>t</sub> focuses on the input words most relevant to the current output word.</li></ul>
+<div class="f"><b>Global</b>: c<sub>t</sub> = Σ<sub>s</sub> a<sub>t</sub>(s) h̄<sub>s</sub> over <b>ALL encoder</b> states; a<sub>t</sub>(s) = softmax<sub>s</sub> score(q<sub>t</sub>, h̄<sub>s</sub>)<br>
+score: dot q<sub>t</sub><sup>T</sup>h̄<sub>s</sub> | general q<sub>t</sub><sup>T</sup>W<sub>a</sub>h̄<sub>s</sub> | concat v<sub>a</sub><sup>T</sup>tanh(W<sub>a</sub>[q<sub>t</sub>; h̄<sub>s</sub>])<br>
+q̃<sub>t</sub> = tanh(W<sub>c</sub>[c<sub>t</sub>; q<sub>t</sub>]) &nbsp;&nbsp; p(y<sub>t</sub>|y<sub>&lt;t</sub>,x) = softmax(W<sub>s</sub>q̃<sub>t</sub>)</div>
+<div class="f"><b>Local</b>: window [p<sub>t</sub>−D, p<sub>t</sub>+D] of encoder states; p<sub>t</sub> = S·sigmoid(v<sub>p</sub><sup>T</sup>tanh(W<sub>p</sub>q<sub>t</sub>)) ∈ [0,S]<br>
+a<sub>t</sub>(s) = align(q<sub>t</sub>, h̄<sub>s</sub>) · exp(−(s−p<sub>t</sub>)² / 2σ²), σ = D/2</div>
+<ul><li>Global = expensive for long sequences. Local = linear combination of encoder states <b>in a window</b>. Largest weight a<sub>t</sub>(s) = most important input word.</li></ul>
+<h2>Transformer</h2>
+<ul><li>RNN problems: slow (sequential), poor long-range. Transformer: no recurrence/conv → <b>parallel</b>, great long-range; order recovered by positional encoding. GPT = Generative Pre-trained Transformer.</li></ul>
+<h2>Self-attention</h2>
+<div class="f">Q = XW<sub>Q</sub>, K = XW<sub>K</sub>, V = XW<sub>V</sub> &nbsp; (X: [L, d<sub>model</sub>], d<sub>Q</sub> = d<sub>K</sub>)<br>
+scores <b>B = QK<sup>T</sup>/√d<sub>k</sub></b> [L,L] &nbsp; probs <b>A = softmax(B, dim=−1)</b> [L,L] &nbsp; <b>Z = AV</b> [L, d<sub>V</sub>] &nbsp; out = ZW<sub>O</sub> [L, d<sub>model</sub>]</div>
+<ul><li>B<sub>ij</sub> = Q<sub>i</sub>·K<sub>j</sub> ≈ sim(x<sub>i</sub>, x<sub>j</sub>); Q, K are two other "views" of X. z<sub>i</sub> depends mainly on x<sub>i</sub> but every x<sub>j</sub> contributes; <b>more similar x<sub>j</sub> → more contribution</b>. Cost O(L²).</li>
+<li><b>Multi-head</b>: each head has its <b>own</b> W<sub>Q</sub>,W<sub>K</sub>,W<sub>V</sub>, computed independently in parallel; <b>concat heads → extra linear W<sub>O</sub></b>.</li>
+<li><b>Masked SA</b> (decoder is causal): B.masked_fill(mask==0, −inf) on future positions → softmax gives 0 there.</li>
+<li><b>Cross-attention</b>: Q = Y W<sub>Q</sub> from <b>decoder</b>; K, V from <b>encoder output</b> X. B: [B, tgt_len, src_len]. Injects encoder output into decoder; part of decoder output only.</li></ul>
+</div>
+</div><!-- end page 1 -->
+
+<div class="page">
+<div class="week w9">
+<h1>WEEK 9 (cont.) · Transformer blocks, BERT</h1>
+<h2>Other blocks</h2>
+<div class="f">PE(pos,2i) = sin(pos/10000<sup>2i/d</sup>) &nbsp; PE(pos,2i+1) = cos(pos/10000<sup>2i/d</sup>) &nbsp; → <b>added</b> to token embeddings</div>
+<div class="f">LayerNorm(Y) = γ (Y − mean)/std + β, stats over <b>embedding dim (d<sub>model</sub>)</b> of each token</div>
+<div class="f">Pointwise FFN: Z̄ = ReLU(ZW<sub>1</sub> + b<sub>1</sub>)W<sub>2</sub> + b<sub>2</sub> (same FFN per token)</div>
+<ul><li>Encoder block: MHSA → Add&amp;LayerNorm (residual) → FFN → Add&amp;LayerNorm; shape [B, L, d<sub>model</sub>] kept, ×n blocks. Decoder: masked MHSA → cross-attn → FFN, then Linear+softmax.</li>
+<li>LN has learnable γ, β; better than BatchNorm for variable-length sequences. PE encodes position of a <b>token in a sentence</b> (not sentence in batch); it is not the embedding itself.</li></ul>
+<h2>BERT (encoder-only, pretrain + fine-tune)</h2>
+<ul><li>Pretrain 1: <b>masked LM</b> – 15% of tokens chosen: 80% → [MASK], 10% → random word, 10% unchanged. Pretrain 2: <b>next sentence prediction</b> – 50% IsNext / 50% NotNext, predicted from [CLS] vector C.</li>
+<li>Fine-tune <b>all</b> params. Classification: P = softmax(WC), W ∈ ℝ<sup>M×h</sup>. Span QA: P<sub>i</sub> = exp(S<sup>T</sup>T<sub>i</sub>)/Σ<sub>j</sub>exp(S<sup>T</sup>T<sub>j</sub>), learn start S and end E vectors. Works because: Transformer + huge data + many params.</li></ul>
+<div class="quiz"><b class="qt">★ Week 9 key concepts (what the quiz tests)</b><ul><li>The <b>encoder</b> turns the input into context c (a summary of the input); the <b>decoder</b> reads c to produce the output. In MT both are RNNs and c = <b>last encoder hidden state</b>.</li><li>In the factorisation, c summarises x<sub>1:Tx</sub> and q<sub>j−1</sub> summarises y<sub>1:j−1</sub>; P(y<sub>j</sub>|q<sub>j−1</sub>, c) = dense layers on top of them. Feeding c only at the start or at every step are both valid.</li><li><b>Decoding</b>: encode to get c → start the decoder from the last encoder hidden state → first input &lt;BOS&gt; → greedy = take the argmax at each step (no sampling).</li><li>A time-varying context beats a fixed one: it copes with long inputs and focuses on the input words relevant to the current output.</li><li><b>Global</b> attention = weighted sum of <b>all encoder</b> states; <b>local</b> = weighted sum of the encoder states inside a window. Never decoder states.</li><li>c<sub>t</sub> = Σ a<sub>t</sub>(s) h̄<sub>s</sub>; the largest weight marks the most important input word.</li><li>Positional encoding = position of a token <b>in the sentence</b>, <b>added</b> to the embeddings. LayerNorm normalises over d<sub>model</sub>, has learnable γ, β, and beats BatchNorm on sequences.</li><li>Self-attention: z<sub>i</sub> comes mostly from x<sub>i</sub> but every x<sub>j</sub> contributes; more similar x<sub>j</sub> gets more weight. Scores B come from Q and K, shape [L, L]; A = softmax(B); Z = <b>AV</b> (not BV).</li><li>Multi-head attention: each head has its <b>own</b> W<sub>Q</sub>, W<sub>K</sub>, W<sub>V</sub> and runs independently; heads are concatenated, then passed through W<sub>O</sub>.</li><li>Cross-attention: Q from the <b>decoder</b>, K and V from the <b>encoder output</b>; it feeds encoder information into the decoder (decoder side only).</li></ul></div>
+</div>
+
+<!-- ================= WEEK 10 ================= -->
+<div class="week w10">
+<h1>WEEK 10 · Vision Transformers, Swin, Fine-tuning</h1>
+<h2>Self- vs cross-attention</h2>
+<ul><li><b>Self</b>: source = target; Q, K, V from the <b>same (source)</b> sequence; captures <b>intra</b>-sequence dependencies. <b>Cross</b>: Q from <b>target</b>, K &amp; V from <b>source</b>; <b>inter</b>-sequence. <span class="k">Both compute token embeddings in parallel.</span> Attention ≈ soft lookup table (query soft-matches keys, returns weighted values).</li></ul>
+<h2>Vision Transformer (ViT, "an image is worth 16×16 words")</h2>
+<div class="f">224×224 image, 16×16 patches → (224/16)² = 14×14 = <b>196 tokens</b> (+1 class token = 197)<br>
+flattened patch = 16·16·3 = 768 → <b>linear projection</b> → token embedding. Pixels as tokens: 224² tokens → 224⁴ ops, impossible.</div>
+<ul><li>Token/visual word = <b>patch</b>. Prepend a <b>learnable</b> class token; MLP head on the class token at the <b>final</b> layer.</li>
+<li>Global info comes from <b>multi-head self-attention</b>; class token at final layer summarises all patch tokens.</li>
+<li>ViT: naturally global, finds long-range dependencies between patches, needs <b>massive data</b> (ImageNet-21K, JFT-300M) – keeps improving with data, while CNN plateaus. More robust than CNNs to occlusion, distribution shift, adversarial perturbation, patch permutation. Low layers: local+global heads; high layers: global.</li>
+<li>CNN: inductive biases (locality, translation invariance) → OK on small data, but lacks global understanding.</li></ul>
+<div class="trap"><b>CNN drawbacks</b>: can't capture global info; can't capture spatial relationships of local objects; locality-sensitive. "Captures local info" and "combines local patterns" are strengths, not drawbacks.</div>
+<h2>Swin Transformer (hierarchical, shifted windows)</h2>
+<div class="f">3×H×W → patch partition 4×4 → 48×H/4×W/4 → linear embed <b>C×H/4×W/4</b> → 2C×H/8×W/8 → 4C×H/16×W/16 → 8C×H/32×W/32 (blocks ×2, ×2, ×6, ×2)</div>
+<div class="f"><b>Patch merging</b>: concat 2×2 neighbouring patches (4C) → linear → 2C: [C, H/4, W/4] → <b>[2C, H/8, W/8]</b> (spatial ÷2, depth ×2)</div>
+<ul><li><b>W-MSA</b>: split tokens into local windows (e.g. 4×4 patches), self-attention <b>inside each window independently</b>; same output shape; faster than global SA; but no cross-window communication.</li>
+<li><b>SW-MSA</b>: shift windows right &amp; down → tokens interact across windows; same output shape. Swin block = W-MSA block then SW-MSA block (each + Add&amp;Norm + FFN).</li></ul>
+<h2>Fine-tuning pretrained ViT</h2>
+<ul><li>Full: new class token + new MLP head, train on new dataset.</li>
+<li><b>PEFT principle</b>: insert additional components that <b>favour (don't change) the original ViT computation</b>; freeze backbone, <b>fine-tune / optimise only the new components</b>.</li></ul>
+<div class="f">Prompt-tuning: learnable prompts inserted among the <b>token embeddings</b><br>
+Adapter (in the <b>pointwise FFN</b>): f(X) = g(X) + σ(XW<sub>down</sub>)W<sub>up</sub>, &nbsp; g(X) = σ(XW<sub>1</sub>)W<sub>2</sub> frozen<br>
+LoRA (on <b>W<sub>Q</sub>, W<sub>K</sub>, W<sub>V</sub></b>): W<sub>Q</sub> + B<sub>Q</sub>A<sub>Q</sub>, W:[m,n], B:[m,r], A:[r,n], r ≪ m,n → r(m+n) trainable vs mn</div>
+<div class="quiz"><b class="qt">★ Week 10 key concepts (what the quiz tests)</b><ul><li>Self- and cross-attention both compute all tokens <b>in parallel</b>. Self-attention: Q, K, V from the source, captures <b>intra</b>-sequence dependencies. Cross-attention: Q from the target, K and V from the source, captures <b>inter</b>-sequence dependencies.</li><li><b>CNN drawbacks</b>: no global information, can't capture spatial relationships between local objects, locality-sensitive.</li><li>ViT: token = <b>patch</b>, turned into an embedding by a linear projection; the class token is <b>learnable</b>; the MLP head sits on the class token at the final layer. Global information comes from <b>multi-head self-attention</b>, and the final class token summarises the image.</li><li>ViT is naturally global and finds long-range dependencies, but needs <b>massive data</b>: it can't be trained directly on small datasets. It is <b>more</b> robust than CNNs.</li><li>Swin: patches of [3, 4, 4] → [C, H/4, W/4]. <b>Patch merging</b>: concatenate 2×2 neighbours, then a linear layer → [2C, H/8, W/8] (half the size, double the depth).</li><li><b>W-MSA</b>: attention inside each local window independently, same output shape, faster, but tokens only meet tokens in their own window. <b>SW-MSA</b>: windows shifted right and down so tokens interact across windows; same output shape.</li><li><b>PEFT</b>: add components that keep the original ViT computation and train only them. Prompts go into the <b>token embeddings</b>, adapters into the <b>pointwise FFN</b>, LoRA into <b>W<sub>Q</sub>, W<sub>K</sub>, W<sub>V</sub></b>.</li></ul></div>
+</div>
+
+<!-- ================= WEEK 11 ================= -->
+<div class="week w11">
+<h1>WEEK 11 · Generative models: GAN &amp; Diffusion</h1>
+<h2>Density estimation</h2>
+<ul><li><b>Explicit</b>: learn p<sub>m</sub>(x) ≈ p<sub>d</sub>(x), e.g. GMM p(x) = Σ<sub>k</sub> π<sub>k</sub>N(x|μ<sub>k</sub>,Σ<sub>k</sub>) fitted with EM; fails on high-dim / structured data (images, text). <b>Implicit</b>: learn generator G: z~p(z) → x̃ = G(z) that mimics data (GAN, VAE). Generative model's task: <b>generate realistic examples imitating the dataset from noise</b>.</li></ul>
+<h2>GAN (Goodfellow 2014)</h2>
+<div class="f"><b>min<sub>G</sub> max<sub>D</sub> J(G,D) = E<sub>x~p<sub>d</sub></sub>[log D(x)] + E<sub>z~p<sub>z</sub></sub>[log(1 − D(G(z)))]</b></div>
+<div class="f">D (ascent): ∇<sub>θd</sub> (1/M)Σ[log D(x<sup>(i)</sup>) + log(1 − D(G(z<sup>(i)</sup>)))]<br>
+G (descent): ∇<sub>θg</sub> (1/M)Σ log(1 − D(G(z<sup>(i)</sup>))) &nbsp;⟶ in practice <b>max<sub>G</sub> E<sub>z</sub> log D(G(z))</b> (stronger gradient when fakes look fake); k = 1 D-step per G-step</div>
+<div class="f">D(x) = P(real | x) via <b>sigmoid</b>; 1 − D(x) = P(fake | x)<br>
+<b>D*(x) = p<sub>d</sub>(x) / (p<sub>d</sub>(x) + p<sub>g</sub>(x)) = 1 / (1 + p<sub>g</sub>/p<sub>d</sub>)</b> &nbsp;(from ∂/∂D: p<sub>d</sub>/D − p<sub>g</sub>/(1−D) = 0)<br>
+J(D*,G) = JSD(p<sub>d</sub>‖p<sub>g</sub>) − 2 log 2 → min at <b>p<sub>g</sub>* = p<sub>d</sub></b>; Nash equilibrium <b>D*(x) = 0.5 ∀x</b></div>
+<ul><li>Analogy: G = counterfeiter making fake money; D = police detecting it. Stop at Nash equilibrium (no player can improve).</li>
+<li>More overlap of p<sub>g</sub>, p<sub>d</sub> ⇒ D's job <b>harder</b>, accuracy → 50%, BCE loss <b>larger</b>. GAN ↔ JSD, f-GAN ↔ f-divergence, WGAN ↔ Wasserstein.</li>
+<li><b>Mode collapse</b>: fakes cover only a few modes, miss others; source: nothing constrains G to cover all modes. Issues: mode collapse, unrealistic images on complex data (ImageNet), unstable training (min-max, no unique loss). Conditional GANs work better.</li>
+<li><b>Inception score</b> (higher = better): p(y|x̃) confident (low entropy) &amp; average p(y) ≈ uniform (diverse): IS ≈ E<sub>z</sub>[KL(p(y|G(z)) ‖ p(y))].</li>
+<li><b>DCGAN</b>: strided conv in D, fractional-strided (transposed) conv in G, no pooling; BatchNorm in both; no FC hidden layers; ReLU in G (tanh output); LeakyReLU in D. Latent arithmetic works.</li></ul>
+<div class="f">ConvTranspose2d out = (in − 1)·s − 2p + k + output_padding &nbsp;&nbsp; Conv2d out = ⌊(in + 2p − k)/s⌋ + 1<br>
+Example: Linear(100→7·7·256) → Unflatten(256,7,7) → ConvT(256→128, k5, s3, p2): (7−1)·3 − 4 + 5 = <b>19</b> → (16,128,19,19)</div>
+<h2>Diffusion models (DDPM)</h2>
+<div class="f">Forward: q(x<sub>t</sub>|x<sub>t−1</sub>) = N(√(1−β<sub>t</sub>) x<sub>t−1</sub>, β<sub>t</sub>I), &nbsp; x<sub>t</sub> = √(1−β<sub>t</sub>) x<sub>t−1</sub> + √β<sub>t</sub> ε<br>
+α<sub>t</sub> = 1 − β<sub>t</sub>, &nbsp; ᾱ<sub>t</sub> = ∏<sub>i≤t</sub>(1 − β<sub>i</sub>), &nbsp; <b>x<sub>t</sub> = √ᾱ<sub>t</sub> x<sub>0</sub> + √(1−ᾱ<sub>t</sub>) ε</b>, ε ~ N(0,I); ᾱ<sub>t</sub>→0 ⇒ x<sub>T</sub> ~ N(0,I)</div>
+<div class="f">Reverse: p<sub>θ</sub>(x<sub>t−1</sub>|x<sub>t</sub>) = N(μ<sub>θ</sub>(x<sub>t</sub>,t), σ<sub>t</sub>²I); q(x<sub>t−1</sub>|x<sub>t</sub>) intractable, q(x<sub>t−1</sub>|x<sub>t</sub>,x<sub>0</sub>) tractable<br>
+μ<sub>θ</sub> = (1/√α<sub>t</sub>)(x<sub>t</sub> − β<sub>t</sub>/√(1−ᾱ<sub>t</sub>) · ε<sub>θ</sub>(x<sub>t</sub>,t)); &nbsp; σ<sub>t</sub>² = β<sub>t</sub> or (1−ᾱ<sub>t−1</sub>)β<sub>t</sub>/(1−ᾱ<sub>t</sub>)<br>
+<b>Loss: min E ‖ε − ε<sub>θ</sub>(x<sub>t</sub>, t)‖²</b> &nbsp; Sample: x<sub>T</sub>~N(0,I); x<sub>t−1</sub> = μ<sub>θ</sub> + σ<sub>t</sub>z, down to x<sub>0</sub></div>
+<ul><li><b>Forward</b> = shrink + add noise to clean images (closed form, no learning). <b>Backward</b> = start from noise, denoise each step (U-Net).</li>
+<li>U-Net ε<sub>θ</sub>(x<sub>t</sub>,t): residual blocks + self-attention; inputs x<sub>t</sub> and time embedding; <b>predicts the added noise ε</b>; crucial for denoising; does NOT do the forward pass.</li>
+<li>Noise schedule: linear (2nd half almost pure noise) vs cosine (noises more slowly).</li>
+<li><b>Latent diffusion</b> (Stable Diffusion): encoder ℰ / decoder 𝒟, diffuse z<sub>0</sub> = ℰ(x<sub>0</sub>) in latent space (faster); condition via cross-attention: Q = W<sub>Q</sub>φ(z<sub>t</sub>), K,V = W·τ<sub>θ</sub>(y); loss ‖ε − ε<sub>θ</sub>(z<sub>t</sub>, t, τ<sub>θ</sub>(y))‖².</li></ul>
+<div class="quiz"><b class="qt">★ Week 11 key concepts (what the quiz tests)</b><ul><li>A generative model's job: generate realistic examples that imitate the dataset, starting from noise.</li><li>Noise goes into <b>G</b>, not D. D separates real from fake (high score for real, low for fake) and so measures the gap between p<sub>g</sub> and p<sub>d</sub>; G mimics real data. G = counterfeiter, D = police.</li><li>Objective: min<sub>G</sub> max<sub>D</sub> E log D(x) + E log(1−D(G(z))). Swapping the two logs (labelling real 0, fake 1) is <b>also valid</b>; max<sub>G</sub> min<sub>D</sub> is the wrong order.</li><li>Alternating updates: max<sub>D</sub> J, then for G either min E log(1−D(G(z))) (original) or max E log D(G(z)) (used in practice).</li><li>When p<sub>g</sub> and p<sub>d</sub> overlap more, D's job gets <b>harder</b>, its accuracy approaches 50% and its BCE loss gets <b>larger</b>.</li><li>D ends in a sigmoid; D(x) = P(real), 1−D(x) = P(fake). D* = p<sub>d</sub>/(p<sub>d</sub>+p<sub>g</sub>) = 1/(1+p<sub>g</sub>/p<sub>d</sub>). At the Nash equilibrium D* = 0.5 and p<sub>g</sub> = p<sub>d</sub>.</li><li><b>Mode collapse</b> = generated data covers only a few modes. Causes: the min-max problem can't be solved perfectly, and nothing forces G to cover all modes. Training issues: mode collapse, unrealistic images on complex data, unstable training.</li><li>Transposed-conv output = (I−1)·S − 2P + K + output_padding: (7−1)·3 − 4 + 5 = 19.</li><li><b>Forward</b> process = shrink the image and add noise; <b>backward</b> = start from noise and denoise step by step. Correct forward formulas: x<sub>t</sub> = √(1−β<sub>t</sub>)x<sub>t−1</sub> + √β<sub>t</sub>ε and x<sub>t</sub> = √ᾱ<sub>t</sub>x<sub>0</sub> + √(1−ᾱ<sub>t</sub>)ε (wrong options swap x<sub>0</sub> and ε, or run t backwards).</li><li>The U-Net is trained by <b>minimising</b> ‖ε<sub>θ</sub>(x<sub>t</sub>,t) − ε‖², predicts the added noise and does the denoising; it does <b>not</b> perform the forward process.</li></ul></div>
+</div>
+</div><!-- end page 2 -->
+</body></html>
